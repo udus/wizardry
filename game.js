@@ -350,6 +350,34 @@ canvas.addEventListener('click', e => {
   player.castFireball(mx, my);
 });
 
+// Mobile controls
+const leftBtn = document.getElementById('left-btn');
+const rightBtn = document.getElementById('right-btn');
+const jumpBtn = document.getElementById('jump-btn');
+const fireballBtn = document.getElementById('fireball-btn');
+
+function setupButton(btn, key, isFireball = false) {
+  if (!btn) return;
+  btn.addEventListener('mousedown', e => { e.preventDefault(); keys[key] = true; if (isFireball) fireballBtnClicked(); });
+  btn.addEventListener('mouseup', e => { e.preventDefault(); if (!isFireball) keys[key] = false; });
+  btn.addEventListener('mouseleave', e => { e.preventDefault(); if (!isFireball) keys[key] = false; });
+  btn.addEventListener('touchstart', e => { e.preventDefault(); keys[key] = true; if (isFireball) fireballBtnClicked(); });
+  btn.addEventListener('touchend', e => { e.preventDefault(); if (!isFireball) keys[key] = false; });
+  btn.addEventListener('touchcancel', e => { e.preventDefault(); if (!isFireball) keys[key] = false; });
+}
+
+function fireballBtnClicked() {
+  ensureAudio();
+  const centerX = cameraX + WIDTH / 2;
+  const centerY = GROUND_Y - 100;
+  player.castFireball(centerX, centerY);
+}
+
+setupButton(leftBtn, 'a');
+setupButton(rightBtn, 'd');
+setupButton(jumpBtn, 'w');
+setupButton(fireballBtn, ' ', true);
+
 class Particle {
   constructor(x, y, vx, vy, life, color) {
     this.x = x;

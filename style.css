@@ -35,6 +35,52 @@ body {
   z-index: 10;
 }
 
+#mobile-controls {
+  position: absolute;
+  bottom: 20px;
+  width: 100%;
+  display: none;
+  justify-content: space-between;
+  padding: 0 20px;
+  z-index: 10;
+}
+
+@media (max-width: 768px) and (pointer: coarse) {
+  #mobile-controls {
+    display: flex;
+  }
+}
+
+#mobile-controls button {
+  pointer-events: auto;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 24px;
+  width: 60px;
+  height: 60px;
+  backdrop-filter: blur(5px);
+}
+
+#mobile-controls button:active {
+  background: rgba(255, 204, 0, 0.5);
+}
+
+#jump-btn {
+  margin-left: auto;
+}
+
+#fireball-btn {
+  position: absolute;
+  right: 20px;
+  bottom: 100px;
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  font-size: 14px;
+}
+
 #score {
   margin-bottom: 5px;
   font-weight: bold;
