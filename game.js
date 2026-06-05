@@ -761,16 +761,10 @@ function draw() {
     ctx.fillStyle = '#666666';
     ctx.fillRect(exitX - 5, GROUND_Y - 125, 90, 10);
 
-    for (const fb of fireballs) {
-      if (fb) fb.draw();
-    }
-    for (const enemy of enemies) {
-      if (enemy) enemy.draw();
-    }
-    if (player) player.draw();
-    for (const p of particles) {
-      if (p) p.draw();
-    }
+    for (const fb of fireballs) fb.draw();
+    for (const enemy of enemies) enemy.draw();
+    player.draw();
+    for (const p of particles) p.draw();
   } finally {
     ctx.restore();
   }
