@@ -30,6 +30,129 @@ function seededRandom(seed) {
   };
 }
 
+const spriteCache = {};
+
+function getSprite(key, pixelData, palette, scale) {
+  const cacheKey = `${key}_${scale}`;
+  if (spriteCache[cacheKey]) return spriteCache[cacheKey];
+  const rows = pixelData.length;
+  const cols = pixelData[0].length;
+  const offscreen = document.createElement('canvas');
+  offscreen.width = cols * scale;
+  offscreen.height = rows * scale;
+  const octx = offscreen.getContext('2d');
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const colorIdx = pixelData[y][x];
+      if (colorIdx === 0) continue;
+      octx.fillStyle = palette[colorIdx];
+      octx.fillRect(x * scale, y * scale, scale, scale);
+    }
+  }
+  spriteCache[cacheKey] = offscreen;
+  return offscreen;
+}
+
+const wizardPalette = [
+  'transparent',
+  '#2a1040',
+  '#4a2878',
+  '#6b3fa0',
+  '#8b5fc0',
+  '#f5d6c6',
+  '#ffffff',
+  '#8b7355',
+  '#ffcc00',
+  '#ff6600',
+  '#aaddff',
+  '#d4a373'
+];
+
+const wizardIdle0 = [
+  [0,0,0,1,1,0,0,0],
+  [0,0,1,1,1,1,0,0],
+  [0,1,1,1,1,1,1,0],
+  [0,1,1,1,1,1,1,0],
+  [0,0,5,5,5,5,0,0],
+  [0,0,4,4,4,4,0,0],
+  [0,1,1,3,3,1,1,0],
+  [0,1,3,3,3,3,1,0],
+  [0,3,3,3,3,3,3,0],
+  [0,0,3,2,2,3,0,0],
+  [0,0,3,2,2,3,0,0],
+  [0,0,0,3,3,0,0,0],
+  [0,0,0,3,3,0,0,0],
+  [0,0,0,3,3,0,0,0],
+  [0,0,1,1,1,1,0,0],
+  [0,0,1,0,0,1,0,0]
+];
+
+const wizardIdle1 = [
+  [0,0,0,1,1,0,0,0],
+  [0,0,1,1,1,1,0,0],
+  [0,1,1,1,1,1,1,0],
+  [0,1,1,1,1,1,1,0],
+  [0,0,5,5,5,5,0,0],
+  [0,0,4,4,4,4,0,0],
+  [0,1,1,3,3,1,1,0],
+  [0,1,3,3,3,3,1,0],
+  [0,3,3,3,3,3,3,0],
+  [0,0,3,2,2,3,0,0],
+  [0,0,3,2,2,3,0,0],
+  [0,0,0,3,3,0,0,0],
+  [0,0,1,1,1,1,0,0],
+  [0,1,1,0,0,1,1,0],
+  [0,1,0,0,0,0,1,0],
+  [0,0,0,0,0,0,0,0]
+];
+
+const skeletonPalette = [
+  'transparent',
+  '#e8e8e8',
+  '#1a1a1a',
+  '#999999',
+  '#ffffff'
+];
+
+const skeletonFrame0 = [
+  [0,0,1,1,1,1,1,0],
+  [0,1,1,1,1,1,1,1],
+  [0,1,2,2,2,2,2,1],
+  [0,1,2,2,2,2,2,1],
+  [0,1,1,1,1,1,1,1],
+  [0,1,3,3,3,3,3,1],
+  [0,1,3,0,0,0,3,1],
+  [0,1,3,0,0,0,3,1],
+  [0,1,1,1,1,1,1,1],
+  [0,1,0,0,0,0,0,1],
+  [0,1,0,0,0,0,0,1],
+  [0,1,0,0,0,0,0,1]
+];
+
+const goblinPalette = [
+  'transparent',
+  '#5a8a3a',
+  '#3d5c28',
+  '#cc3333',
+  '#4a3728',
+  '#2a1a0a'
+];
+
+const goblinFrame0 = [
+  [0,0,1,1,1,1,1,0],
+  [0,1,1,1,1,1,1,1],
+  [0,1,2,2,2,2,2,1],
+  [0,1,1,1,1,1,1,1],
+  [0,1,2,2,2,2,2,1],
+  [0,1,2,2,2,2,2,1],
+  [0,0,1,1,1,1,1,0],
+  [0,0,1,1,1,1,1,0],
+  [0,0,1,0,0,0,1,0],
+  [0,0,4,0,0,0,4,0],
+  [0,0,5,0,0,0,5,0],
+  [0,0,0,0,0,0,0,0]
+];
+
 function generateRoom(roomIndex) {
   const rand = seededRandom(roomIndex * 12345 + roomSeed++);
   const baseX = roomIndex * ROOM_WIDTH;
@@ -305,6 +428,7 @@ class Enemy {
     this.deathTimer = 0;
     this.flash = 0;
     this.grounded = false;
+    this.type = Math.random() < 0.5 ? 'skeleton' : 'goblin';
   }
 
   update(dt, playerX) {
@@ -357,15 +481,14 @@ class Enemy {
       ctx.fillRect(this.x - this.width / 2 - 2, this.y - this.height - 2, this.width + 4, this.height + 4);
     }
 
-    ctx.fillStyle = this.flash > 0 ? '#fff' : '#cc3333';
-    ctx.fillRect(this.x - this.width / 2, this.y - this.height, this.width, this.height);
+    const spriteKey = this.type === 'skeleton' ? 'skeleton' : 'goblin';
+    const pixelData = this.type === 'skeleton' ? skeletonFrame0 : goblinFrame0;
+    const palette = this.type === 'skeleton' ? skeletonPalette : goblinPalette;
+    const sprite = getSprite(spriteKey, pixelData, palette, 2);
 
-    if (!this.dying) {
-      ctx.fillStyle = '#fff';
-      const eyeOffX = this.vx > 0 ? 4 : -4;
-      ctx.fillRect(this.x - 4 + eyeOffX, this.y - this.height + 5, 3, 3);
-      ctx.fillRect(this.x + 1 + eyeOffX, this.y - this.height + 5, 3, 3);
-    }
+    const drawX = this.x - sprite.width / 2;
+    const drawY = this.y - sprite.height;
+    ctx.drawImage(sprite, drawX, drawY);
 
     ctx.restore();
   }
@@ -402,6 +525,9 @@ class Player {
     this.invincibleTimer = 0;
     this.invincibleDuration = 1.5;
     this.flashTimer = 0;
+    this.wandTimer = 0;
+    this.spriteFrame = 0;
+    this.spriteTimer = 0;
   }
 
   update(dt) {
@@ -481,12 +607,32 @@ class Player {
     }
 
     this.cooldown = Math.max(0, this.cooldown - dt);
+    this.wandTimer = Math.max(0, this.wandTimer - dt);
+
+    this.spriteTimer += dt;
+    if (this.wandTimer > 0) {
+      if (this.spriteTimer > 0.08) {
+        this.spriteTimer = 0;
+        this.spriteFrame = this.spriteFrame === 0 ? 1 : 0;
+      }
+    } else if (Math.abs(this.vx) > 1) {
+      if (this.spriteTimer > 0.12) {
+        this.spriteTimer = 0;
+        this.spriteFrame = this.spriteFrame === 0 ? 1 : 0;
+      }
+    } else {
+      if (this.spriteTimer > 0.25) {
+        this.spriteTimer = 0;
+        this.spriteFrame = this.spriteFrame === 0 ? 1 : 0;
+      }
+    }
   }
 
   castFireball(tx, ty) {
     if (this.cooldown > 0) return;
     fireballs.push(new Fireball(this.x, this.y - this.height / 2, tx, ty));
     this.cooldown = 0.4;
+    this.wandTimer = 0.25;
     if (audio && audio.playFireball) audio.playFireball();
   }
 
@@ -495,15 +641,41 @@ class Player {
       ctx.globalAlpha = 0.5;
     }
 
-    ctx.fillStyle = '#4488ff';
-    ctx.fillRect(this.x - this.width / 2, this.y - this.height, this.width, this.height);
+    const frameData = this.spriteFrame === 0 ? wizardIdle0 : wizardIdle1;
+    const sprite = getSprite('wizard_idle_' + this.spriteFrame, frameData, wizardPalette, 2);
 
-    ctx.fillStyle = '#2266cc';
-    ctx.fillRect(this.x - this.width / 2, this.y - 4, this.width, 4);
+    ctx.save();
+    const drawX = this.x - sprite.width / 2;
+    const drawY = this.y - sprite.height;
+    if (this.facing < 0) {
+      ctx.translate(this.x + sprite.width / 2, this.y);
+      ctx.scale(-1, 1);
+      ctx.drawImage(sprite, -sprite.width / 2, -sprite.height);
+    } else {
+      ctx.drawImage(sprite, drawX, drawY);
+    }
+    ctx.restore();
 
-    const eyeX = this.facing > 0 ? 4 : -8;
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(this.x - 4 + eyeX, this.y - this.height + 6, 4, 4);
+    if (this.wandTimer > 0) {
+      const swing = Math.sin(this.wandTimer * 25) * 8;
+      const wandBaseX = this.facing > 0 ? this.x + 8 : this.x - 8;
+      const wandBaseY = this.y - 18;
+      ctx.strokeStyle = '#8b7355';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(wandBaseX, wandBaseY);
+      ctx.lineTo(wandBaseX + 6 * this.facing, wandBaseY - 12 + swing);
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffcc00';
+      ctx.beginPath();
+      ctx.arc(wandBaseX + 6 * this.facing, wandBaseY - 14 + swing, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ff6600';
+      ctx.beginPath();
+      ctx.arc(wandBaseX + 6 * this.facing, wandBaseY - 14 + swing, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     if (!this.grounded) {
       for (let i = 0; i < 3; i++) {
@@ -700,6 +872,7 @@ function drawCastleWall() {
       ctx.moveTo(block.x + 4, block.y + block.h - 4);
       ctx.lineTo(block.x + block.w - 4, block.y + 4);
       ctx.stroke();
+      ctx.strokeStyle = '#181818';
     }
   }
 
