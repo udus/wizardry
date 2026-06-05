@@ -6,6 +6,22 @@ const HEIGHT = 600;
 canvas.width = WIDTH;
 canvas.height = HEIGHT;
 
+function resizeCanvas() {
+  const ww = window.innerWidth;
+  const wh = window.innerHeight;
+  const aspect = WIDTH / HEIGHT;
+  const windowAspect = ww / wh;
+  if (windowAspect > aspect) {
+    canvas.style.width = (ww * aspect / windowAspect) + 'px';
+    canvas.style.height = '100vh';
+  } else {
+    canvas.style.width = '100vw';
+    canvas.style.height = (wh * windowAspect / aspect) + 'px';
+  }
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
 const GROUND_Y = HEIGHT - 40;
 const stoneColors = ['#5a5a5a', '#6e6e6e', '#7a7a7a', '#555555', '#666666'];
 
@@ -343,10 +359,10 @@ window.addEventListener('keyup', e => {
 canvas.addEventListener('click', e => {
   ensureAudio();
   const rect = canvas.getBoundingClientRect();
-  const scaleX = WIDTH / rect.width;
-  const scaleY = HEIGHT / rect.height;
-  const mx = (e.clientX - rect.left) * scaleX + cameraX;
-  const my = (e.clientY - rect.top) * scaleY;
+  const clickScaleX = WIDTH / rect.width;
+  const clickScaleY = HEIGHT / rect.height;
+  const mx = (e.clientX - rect.left) * clickScaleX + cameraX;
+  const my = (e.clientY - rect.top) * clickScaleY;
   player.castFireball(mx, my);
 });
 

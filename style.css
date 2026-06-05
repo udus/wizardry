@@ -6,22 +6,29 @@
 
 body {
   background: #1a1a1a;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  font-family: 'Courier New', monospace;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
 #game-container {
-  position: relative;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 #gameCanvas {
   display: block;
   background: #2a2a2a;
-  border: 2px solid #444;
+  max-width: 100vw;
+  max-height: 100vh;
+  width: auto;
+  height: auto;
 }
 
 #ui {
