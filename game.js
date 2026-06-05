@@ -18,6 +18,7 @@ let player;
 let cameraX = 0;
 let platforms = [];
 let decorations = [];
+let wallBlocks = [];
 let currentRoomIndex = 0;
 let roomSeed = 1;
 
@@ -34,6 +35,23 @@ function generateRoom(roomIndex) {
 
   platforms = [];
   decorations = [];
+  wallBlocks = [];
+
+  const wallRand = seededRandom(roomIndex * 98765 + 1);
+  const blockH = 28;
+  const blockW = 56;
+  const rows = Math.ceil(GROUND_Y / blockH) + 1;
+  const cols = Math.ceil(ROOM_WIDTH / blockW) + 2;
+
+  for (let row = 0; row < rows; row++) {
+    const offset = (row % 2) * (blockW / 2);
+    for (let col = -1; col < cols; col++) {
+      const x = baseX + col * blockW + offset;
+      const y = row * blockH;
+      const shade = 32 + Math.sin(col * 0.7 + row * 0.5) * 8 + wallRand() * 6;
+      wallBlocks.push({ x, y, w: blockW - 1, h: blockH - 1, shade });
+    }
+  }
 
   const numPlatforms = Math.floor(rand() * 3) + 2;
   const difficulty = Math.min(roomIndex, 4);
@@ -138,6 +156,7 @@ function generateRoom(roomIndex) {
 generateRoom(0);
 
 window.addEventListener('keydown', e => {
+  ensureAudio();
   keys[e.key.toLowerCase()] = true;
   if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w'].includes(e.key.toLowerCase())) {
     e.preventDefault();
@@ -148,6 +167,7 @@ window.addEventListener('keyup', e => {
 });
 
 canvas.addEventListener('click', e => {
+  ensureAudio();
   const rect = canvas.getBoundingClientRect();
   const scaleX = WIDTH / rect.width;
   const scaleY = HEIGHT / rect.height;
@@ -446,6 +466,7 @@ class Player {
     if (this.cooldown > 0) return;
     fireballs.push(new Fireball(this.x, this.y - this.height / 2, tx, ty));
     this.cooldown = 0.4;
+    if (audio && audio.playFireball) audio.playFireball();
   }
 
   draw() {
@@ -553,6 +574,7 @@ function update(dt) {
           enemy.deathTimer = 0.3;
           score++;
           document.getElementById('score').textContent = `Score: ${score}`;
+          if (audio && audio.playExplosion) audio.playExplosion();
         }
         hitEnemy = true;
         break;
@@ -595,6 +617,7 @@ function update(dt) {
       spawnTimer = 0;
       score = 0;
       document.getElementById('score').textContent = 'Score: 0';
+      if (audio && audio.playDeath) audio.playDeath();
       break;
     }
 
@@ -628,7 +651,25 @@ function update(dt) {
     score += 100;
     document.getElementById('score').textContent = `Score: ${score}`;
     console.log('Advanced to room', currentRoomIndex, '! Total score:', score);
+    if (audio && audio.playFanfare) audio.playFanfare();
   }
+}
+
+function drawCastleWall() {
+  ctx.fillStyle = '#252525';
+  ctx.fillRect(0, 0, ROOM_WIDTH, GROUND_Y);
+
+  ctx.strokeStyle = '#181818';
+  ctx.lineWidth = 1;
+  for (const block of wallBlocks) {
+    ctx.fillStyle = `rgb(${block.shade}, ${block.shade}, ${block.shade + 1})`;
+    ctx.fillRect(block.x, block.y, block.w, block.h);
+    ctx.strokeRect(block.x, block.y, block.w, block.h);
+  }
+
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(0, 0, ROOM_WIDTH, 3);
+  ctx.fillRect(0, GROUND_Y - 3, ROOM_WIDTH, 3);
 }
 
 function draw() {
@@ -636,8 +677,7 @@ function draw() {
   try {
     ctx.translate(-cameraX, 0);
 
-    ctx.fillStyle = '#222222';
-    ctx.fillRect(cameraX, 0, WIDTH, HEIGHT);
+    drawCastleWall();
 
     ctx.fillStyle = '#3a3a3a';
     ctx.fillRect(cameraX, GROUND_Y, WIDTH, HEIGHT - GROUND_Y);
@@ -648,15 +688,6 @@ function draw() {
     ctx.moveTo(cameraX, GROUND_Y);
     ctx.lineTo(cameraX + WIDTH, GROUND_Y);
     ctx.stroke();
-
-    ctx.strokeStyle = '#333333';
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= WIDTH; i += 40) {
-      ctx.beginPath();
-      ctx.moveTo(cameraX + i, GROUND_Y);
-      ctx.lineTo(cameraX + i, HEIGHT);
-      ctx.stroke();
-    }
 
     for (const plat of platforms) {
       ctx.fillStyle = plat.color;
@@ -788,3 +819,131 @@ console.log('Game started. Particles:', particles.length, 'Fireballs:', fireball
 setInterval(() => {
   console.log('Stats - Particles:', particles.length, 'Fireballs:', fireballs.length, 'Enemies:', enemies.length);
 }, 5000);
+
+class AudioController {
+  constructor() {
+    this.ctx = null;
+    this.masterGain = null;
+    this.bgmGain = null;
+    this.sfxGain = null;
+    this.bgmInterval = null;
+    this.step = 0;
+    this.initialized = false;
+  }
+
+  init() {
+    if (this.initialized) return;
+    try {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this.masterGain = this.ctx.createGain();
+      this.masterGain.gain.value = 0.25;
+      this.masterGain.connect(this.ctx.destination);
+
+      this.bgmGain = this.ctx.createGain();
+      this.bgmGain.gain.value = 0.15;
+      this.bgmGain.connect(this.masterGain);
+
+      this.sfxGain = this.ctx.createGain();
+      this.sfxGain.gain.value = 0.4;
+      this.sfxGain.connect(this.masterGain);
+
+      this.initialized = true;
+      this.startBGM();
+    } catch (e) {
+      console.warn('Audio init failed:', e);
+    }
+  }
+
+  resume() {
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+  }
+
+  startBGM() {
+    if (!this.initialized || this.bgmInterval) return;
+    const bassline = [130.81, 164.81, 196.0, 130.81];
+    const melody = [523.25, 659.25, 783.99, 659.25];
+    let noteIndex = 0;
+    this.bgmInterval = setInterval(() => {
+      if (!this.initialized) return;
+      const t = this.ctx.currentTime;
+      const bass = bassline[noteIndex % bassline.length];
+      const mel = melody[noteIndex % melody.length];
+
+      this.playTone(bass, 'square', 0.12, this.bgmGain, t);
+      if (noteIndex % 2 === 0) {
+        this.playTone(mel, 'triangle', 0.08, this.bgmGain, t + 0.06);
+      }
+      noteIndex++;
+    }, 220);
+  }
+
+  playTone(freq, type, duration, output, startTime) {
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.4, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+    osc.connect(gain);
+    gain.connect(output);
+    osc.start(startTime);
+    osc.stop(startTime + duration);
+  }
+
+  playNoise(duration, output, startTime) {
+    const bufferSize = this.ctx.sampleRate * duration;
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    const noise = this.ctx.createBufferSource();
+    const gain = this.ctx.createGain();
+    noise.buffer = buffer;
+    gain.gain.setValueAtTime(0.35, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+    noise.connect(gain);
+    gain.connect(output);
+    noise.start(startTime);
+    noise.stop(startTime + duration);
+  }
+
+  playFireball() {
+    if (!this.initialized) return;
+    const t = this.ctx.currentTime;
+    this.playTone(880, 'square', 0.08, this.sfxGain, t);
+    this.playTone(440, 'sawtooth', 0.1, this.sfxGain, t + 0.04);
+  }
+
+  playExplosion() {
+    if (!this.initialized) return;
+    const t = this.ctx.currentTime;
+    this.playNoise(0.12, this.sfxGain, t);
+    this.playTone(120, 'sawtooth', 0.15, this.sfxGain, t);
+  }
+
+  playDeath() {
+    if (!this.initialized) return;
+    const t = this.ctx.currentTime;
+    this.playTone(220, 'sawtooth', 0.25, this.sfxGain, t);
+    this.playNoise(0.25, this.sfxGain, t);
+    this.playTone(110, 'triangle', 0.3, this.sfxGain, t + 0.15);
+  }
+
+  playFanfare() {
+    if (!this.initialized) return;
+    const t = this.ctx.currentTime;
+    const notes = [523.25, 659.25, 783.99];
+    notes.forEach((freq, i) => {
+      this.playTone(freq, 'triangle', 0.12, this.sfxGain, t + i * 0.1);
+    });
+  }
+}
+
+const audio = new AudioController();
+function ensureAudio() {
+  audio.init();
+  audio.resume();
+}
