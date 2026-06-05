@@ -80,11 +80,7 @@ const wizardIdle0 = [
   [0,3,3,3,3,3,3,0],
   [0,0,3,2,2,3,0,0],
   [0,0,3,2,2,3,0,0],
-  [0,0,0,3,3,0,0,0],
-  [0,0,0,3,3,0,0,0],
-  [0,0,0,3,3,0,0,0],
-  [0,0,1,1,1,1,0,0],
-  [0,0,1,0,0,1,0,0]
+  [0,0,0,3,3,0,0,0]
 ];
 
 const wizardIdle1 = [
@@ -99,11 +95,7 @@ const wizardIdle1 = [
   [0,3,3,3,3,3,3,0],
   [0,0,3,2,2,3,0,0],
   [0,0,3,2,2,3,0,0],
-  [0,0,0,3,3,0,0,0],
-  [0,0,1,1,1,1,0,0],
-  [0,1,1,0,0,1,1,0],
-  [0,1,0,0,0,0,1,0],
-  [0,0,0,0,0,0,0,0]
+  [0,0,0,3,3,0,0,0]
 ];
 
 const skeletonPalette = [
@@ -121,6 +113,21 @@ const skeletonFrame0 = [
   [0,1,2,2,2,2,2,1],
   [0,1,1,1,1,1,1,1],
   [0,1,3,3,3,3,3,1],
+  [0,1,3,0,0,0,3,1],
+  [0,1,3,0,0,0,3,1],
+  [0,1,1,1,1,1,1,1],
+  [0,1,0,0,0,0,0,1],
+  [0,1,0,0,0,0,0,1],
+  [0,1,0,0,0,0,0,1]
+];
+
+const skeletonFrame1 = [
+  [0,0,0,1,1,1,0,0],
+  [0,0,1,1,1,1,1,0],
+  [0,1,2,2,2,2,2,0],
+  [0,1,2,2,2,2,2,1],
+  [0,0,1,1,1,1,1,1],
+  [0,0,3,3,3,3,3,0],
   [0,1,3,0,0,0,3,1],
   [0,1,3,0,0,0,3,1],
   [0,1,1,1,1,1,1,1],
@@ -152,6 +159,29 @@ const goblinFrame0 = [
   [0,0,5,0,0,0,5,0],
   [0,0,0,0,0,0,0,0]
 ];
+
+const goblinFrame1 = [
+  [0,0,1,1,1,1,1,0],
+  [0,1,1,1,1,1,1,1],
+  [0,1,2,2,2,2,2,1],
+  [0,1,1,1,1,1,1,1],
+  [0,1,2,2,2,2,2,1],
+  [0,1,2,2,2,2,2,1],
+  [0,0,1,1,1,1,1,0],
+  [0,0,1,1,1,1,1,0],
+  [0,0,1,0,0,0,1,0],
+  [0,0,4,0,0,0,4,0],
+  [0,0,5,0,0,0,5,0],
+  [0,0,0,0,0,0,0,0]
+];
+
+// Warm sprite cache
+getSprite('wizard_idle_0', wizardIdle0, wizardPalette, 2);
+getSprite('wizard_idle_1', wizardIdle1, wizardPalette, 2);
+getSprite('skeleton_frame0', skeletonFrame0, skeletonPalette, 2);
+getSprite('skeleton_frame1', skeletonFrame1, skeletonPalette, 2);
+getSprite('goblin_frame0', goblinFrame0, goblinPalette, 2);
+getSprite('goblin_frame1', goblinFrame1, goblinPalette, 2);
 
 function generateRoom(roomIndex) {
   const rand = seededRandom(roomIndex * 12345 + roomSeed++);
@@ -429,6 +459,8 @@ class Enemy {
     this.flash = 0;
     this.grounded = false;
     this.type = Math.random() < 0.5 ? 'skeleton' : 'goblin';
+    this.spriteFrame = 0;
+    this.spriteTimer = 0;
   }
 
   update(dt, playerX) {
@@ -467,6 +499,12 @@ class Enemy {
     }
 
     this.flash = Math.max(0, this.flash - dt);
+
+    this.spriteTimer += dt;
+    if (this.spriteTimer > 0.5) {
+      this.spriteTimer = 0;
+      this.spriteFrame = this.spriteFrame === 0 ? 1 : 0;
+    }
   }
 
   draw() {
@@ -481,14 +519,22 @@ class Enemy {
       ctx.fillRect(this.x - this.width / 2 - 2, this.y - this.height - 2, this.width + 4, this.height + 4);
     }
 
-    const spriteKey = this.type === 'skeleton' ? 'skeleton' : 'goblin';
-    const pixelData = this.type === 'skeleton' ? skeletonFrame0 : goblinFrame0;
+    const facing = this.x > cameraX + WIDTH / 2 ? -1 : 1;
     const palette = this.type === 'skeleton' ? skeletonPalette : goblinPalette;
-    const sprite = getSprite(spriteKey, pixelData, palette, 2);
+    const frameData = this.type === 'skeleton'
+      ? (this.spriteFrame === 0 ? skeletonFrame0 : skeletonFrame1)
+      : (this.spriteFrame === 0 ? goblinFrame0 : goblinFrame1);
+    const sprite = getSprite(this.type + '_frame' + this.spriteFrame, frameData, palette, 2);
 
     const drawX = this.x - sprite.width / 2;
     const drawY = this.y - sprite.height;
-    ctx.drawImage(sprite, drawX, drawY);
+    if (facing < 0) {
+      ctx.translate(this.x + sprite.width / 2, this.y);
+      ctx.scale(-1, 1);
+      ctx.drawImage(sprite, -sprite.width / 2, -sprite.height);
+    } else {
+      ctx.drawImage(sprite, drawX, drawY);
+    }
 
     ctx.restore();
   }
@@ -517,8 +563,6 @@ class Player {
     this.grounded = false;
     this.facing = 1;
     this.cooldown = 0;
-    this.jumpHoldTime = 0;
-    this.maxJumpHold = 0.25;
     this.coyoteTimer = 0;
     this.coyoteWindow = 0.12;
     this.invincible = false;
@@ -528,6 +572,9 @@ class Player {
     this.wandTimer = 0;
     this.spriteFrame = 0;
     this.spriteTimer = 0;
+    this.jumpBoost = 0;
+    this.jumpBoostMax = 200;
+    this.maxJumpHold = 0.25;
   }
 
   update(dt) {
@@ -554,18 +601,15 @@ class Player {
       this.vy = this.jumpForce;
       this.grounded = false;
       this.coyoteTimer = 0;
-      this.jumpHoldTime = this.maxJumpHold;
+      this.jumpBoost = this.jumpBoostMax;
     }
 
-    if (jumpPressed && this.jumpHoldTime > 0) {
-      this.jumpHoldTime -= dt;
-      this.vy += 180 * dt;
-    } else {
-      this.jumpHoldTime = 0;
-    }
-
-    if (!jumpPressed) {
-      this.jumpHoldTime = 0;
+    if (jumpPressed && this.jumpBoost > 0) {
+      this.vy = Math.max(this.jumpForce, this.vy - (this.jumpBoost / this.maxJumpHold) * dt);
+      this.jumpBoost -= dt * this.jumpBoostMax / this.maxJumpHold;
+    } else if (!jumpPressed && this.jumpBoost > 0) {
+      this.jumpBoost = 0;
+      this.vy = Math.max(this.vy, -80);
     }
 
     this.vy += 900 * dt;
@@ -1029,10 +1073,10 @@ function draw() {
     ctx.fillStyle = '#666666';
     ctx.fillRect(exitX - 5, GROUND_Y - 125, 90, 10);
 
-    for (const fb of fireballs) fb.draw();
-    for (const enemy of enemies) enemy.draw();
-    player.draw();
-    for (const p of particles) p.draw();
+    for (const fb of fireballs) fb && fb.draw();
+    for (const enemy of enemies) enemy && enemy.draw();
+    player && player.draw();
+    for (const p of particles) p && p.draw();
   } finally {
     ctx.restore();
   }
