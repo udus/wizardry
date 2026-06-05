@@ -19,6 +19,7 @@ let cameraX = 0;
 let platforms = [];
 let decorations = [];
 let wallBlocks = [];
+let roomWindows = [];
 let currentRoomIndex = 0;
 let roomSeed = 1;
 
@@ -36,6 +37,7 @@ function generateRoom(roomIndex) {
   platforms = [];
   decorations = [];
   wallBlocks = [];
+  roomWindows = [];
 
   const wallRand = seededRandom(roomIndex * 98765 + 1);
   const blockH = 28;
@@ -48,9 +50,28 @@ function generateRoom(roomIndex) {
     for (let col = -1; col < cols; col++) {
       const x = baseX + col * blockW + offset;
       const y = row * blockH;
-      const shade = 32 + Math.sin(col * 0.7 + row * 0.5) * 8 + wallRand() * 6;
-      wallBlocks.push({ x, y, w: blockW - 1, h: blockH - 1, shade });
+      const qualityRand = wallRand();
+      let shade = 32 + Math.sin(col * 0.7 + row * 0.5) * 8 + wallRand() * 6;
+      let broken = false;
+      let moss = false;
+      if (qualityRand > 0.92) {
+        shade -= 12;
+        broken = true;
+      } else if (qualityRand > 0.85) {
+        shade += 4;
+        moss = true;
+      }
+      wallBlocks.push({ x, y, w: blockW - 1, h: blockH - 1, shade, broken, moss });
     }
+  }
+
+  const numRoomWindows = Math.floor(wallRand() * 3) + (roomIndex > 0 ? 1 : 0);
+  for (let i = 0; i < numRoomWindows; i++) {
+    const wx = baseX + wallRand() * (ROOM_WIDTH - 300) + 150;
+    const wy = wallRand() * 120 + 50;
+    const ww = 70 + wallRand() * 40;
+    const wh = 90 + wallRand() * 50;
+    roomWindows.push({ x: wx, y: wy, w: ww, h: wh });
   }
 
   const numPlatforms = Math.floor(rand() * 3) + 2;
@@ -665,6 +686,49 @@ function drawCastleWall() {
     ctx.fillStyle = `rgb(${block.shade}, ${block.shade}, ${block.shade + 1})`;
     ctx.fillRect(block.x, block.y, block.w, block.h);
     ctx.strokeRect(block.x, block.y, block.w, block.h);
+    if (block.moss) {
+      ctx.fillStyle = 'rgba(45, 74, 30, 0.35)';
+      ctx.fillRect(block.x + 1, block.y + 1, block.w - 2, 6);
+      ctx.fillRect(block.x + 1, block.y + 1, 6, block.h - 2);
+    }
+    if (block.broken) {
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.fillRect(block.x + block.w - 6, block.y + 2, 4, 4);
+      ctx.fillRect(block.x + 2, block.y + block.h - 6, 5, 4);
+      ctx.strokeStyle = '#111111';
+      ctx.beginPath();
+      ctx.moveTo(block.x + 4, block.y + block.h - 4);
+      ctx.lineTo(block.x + block.w - 4, block.y + 4);
+      ctx.stroke();
+    }
+  }
+
+  for (const win of roomWindows) {
+    ctx.fillStyle = '#0a0a14';
+    ctx.fillRect(win.x, win.y, win.w, win.h);
+    ctx.strokeStyle = '#3a3028';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(win.x, win.y, win.w, win.h);
+    ctx.beginPath();
+    ctx.moveTo(win.x + win.w / 2, win.y);
+    ctx.lineTo(win.x + win.w / 2, win.y + win.h);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(win.x, win.y + win.h * 0.4);
+    ctx.lineTo(win.x + win.w, win.y + win.h * 0.4);
+    ctx.stroke();
+    const starCount = Math.floor(win.w / 8);
+    for (let i = 0; i < starCount; i++) {
+      const sx = win.x + 4 + (i * 13) % (win.w - 8);
+      const sy = win.y + 6 + (i * 7) % (win.h - 12);
+      const bright = 150 + (i % 3) * 35;
+      ctx.fillStyle = `rgb(${bright}, ${bright}, ${Math.min(255, bright + 20)})`;
+      ctx.fillRect(sx, sy, 2, 2);
+    }
+    ctx.fillStyle = '#ffeebb';
+    ctx.beginPath();
+    ctx.arc(win.x + win.w - 14, win.y + 14, 4, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   ctx.fillStyle = '#1a1a1a';
