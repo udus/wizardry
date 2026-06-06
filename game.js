@@ -426,6 +426,43 @@ class Particle {
   get dead() { return this.life <= 0; }
 }
 
+class Arrow {
+  constructor(x, y, dir) {
+    this.x = x;
+    this.y = y;
+    this.vx = dir * 300;
+    this.vy = -100;
+    this.radius = 4;
+    this.life = 2;
+  }
+
+  update(dt) {
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    this.life -= dt;
+  }
+
+  draw() {
+    ctx.fillStyle = '#d4a373';
+    ctx.beginPath();
+    ctx.moveTo(this.x, this.y);
+    ctx.lineTo(this.x - this.vx * 0.02, this.y - this.vy * 0.02 - 8);
+    ctx.lineTo(this.x - this.vx * 0.02 + 4, this.y - this.vy * 0.02 + 4);
+    ctx.fill();
+  }
+
+  get dead() { return this.life <= 0; }
+
+  get bounds() {
+    return {
+      x: this.x - 4,
+      y: this.y - 4,
+      w: 8,
+      h: 8
+    };
+  }
+}
+
 class Fireball {
   constructor(x, y, tx, ty) {
     this.x = x;
@@ -493,18 +530,34 @@ class Enemy {
     this.y = GROUND_Y - 20;
     this.vx = 0;
     this.vy = 0;
-    this.width = 24;
-    this.height = 24;
-    this.speed = 80 + Math.random() * 40;
-    this.hp = 1;
-    this.alive = true;
+    this.grounded = false;
     this.dying = false;
     this.deathTimer = 0;
     this.flash = 0;
-    this.grounded = false;
-    this.type = Math.random() < 0.5 ? 'skeleton' : 'goblin';
     this.spriteFrame = 0;
     this.spriteTimer = 0;
+    this.patrolDirection = 1;
+    this.jumpTimer = 0;
+    
+    // 30% chance for skeleton, 70% for goblin
+    if (Math.random() < 0.3) {
+      this.type = 'skeleton';
+      this.width = 32;
+      this.height = 40;
+      this.speed = 60 + Math.random() * 30;
+      this.hp = 2;
+      this.weapon = Math.random() < 0.5 ? 'sword' : 'bow';
+      this.attackCooldown = 0;
+      this.isRanged = this.weapon === 'bow';
+    } else {
+      this.type = 'goblin';
+      this.width = 20;
+      this.height = 20;
+      this.speed = 150 + Math.random() * 50;
+      this.hp = 1;
+      this.weapon = 'sword';
+      this.isRanged = false;
+    }
   }
 
   update(dt, playerX) {
@@ -514,18 +567,56 @@ class Enemy {
       return;
     }
 
-    const dir = playerX > this.x ? 1 : -1;
-    this.vx = dir * this.speed;
-    this.vy += 800 * dt;
+    const onGround = this.grounded;
+    const isMelee = this.weapon === 'sword';
+    
+    let dir = 0;
+    if (isMelee) {
+      // Melee: approach player horizontally but patrol if at same X
+      const distToPlayerX = Math.abs(playerX - this.x);
+      if (distToPlayerX < 20) {
+        // At player's X, start patrolling - occasionally flip direction
+        if (Math.random() < 0.01) this.patrolDirection *= -1;
+        this.vx = this.patrolDirection * this.speed * 0.5;
+      } else {
+        dir = playerX > this.x ? 1 : -1;
+        this.vx = dir * this.speed;
+      }
+    } else {
+      // Ranged: maintain distance, approach to minimum range if too far
+      const distToPlayer = Math.abs(playerX - this.x);
+      const minRange = 150;
+      const maxRange = 300;
+      if (distToPlayer < minRange) {
+        dir = playerX < this.x ? -1 : 1; // Move away if too close
+        this.vx = dir * this.speed * 0.7;
+      } else if (distToPlayer > maxRange) {
+        dir = playerX > this.x ? 1 : -1; // Approach if too far
+        this.vx = dir * this.speed * 0.7;
+      } else {
+        this.vx = 0; // In range, stop moving
+      }
+    }
+
+    this.vy += 900 * dt;
     this.x += this.vx * dt;
     this.y += this.vy * dt;
 
+    // Goblin periodic jumping
+    if (this.type === 'goblin' && onGround) {
+      this.jumpTimer -= dt;
+      if (this.jumpTimer <= 0) {
+        this.jumpTimer = 1 + Math.random() * 2;
+        this.vy = -350 - Math.random() * 100;
+      }
+    }
+
+    this.grounded = false;
     if (this.y >= GROUND_Y) {
       this.y = GROUND_Y;
       this.vy = 0;
       this.grounded = true;
     } else {
-      this.grounded = false;
       for (const plat of platforms) {
         if (
           this.vy >= 0 &&
@@ -544,8 +635,19 @@ class Enemy {
 
     this.flash = Math.max(0, this.flash - dt);
 
+    // Ranged skeleton shoot arrows
+    if (this.isRanged && !this.dying) {
+      this.attackCooldown = (this.attackCooldown || 0) - dt;
+      const distToPlayer = Math.abs(playerX - this.x);
+      if (distToPlayer >= 150 && distToPlayer <= 300 && this.grounded && this.attackCooldown <= 0) {
+        const facing = playerX > this.x ? 1 : -1;
+        arrows.push(new Arrow(this.x, this.y - this.height / 2, facing));
+        this.attackCooldown = 1.5 + Math.random() * 0.5;
+      }
+    }
+
     this.spriteTimer += dt;
-    if (this.spriteTimer > 0.5) {
+    if (this.spriteTimer > 0.3) {
       this.spriteTimer = 0;
       this.spriteFrame = this.spriteFrame === 0 ? 1 : 0;
     }
@@ -580,6 +682,18 @@ class Enemy {
       ctx.drawImage(sprite, drawX, drawY);
     }
 
+    // Draw weapon for skeletons
+    if (this.type === 'skeleton') {
+      if (this.weapon === 'bow') {
+        ctx.fillStyle = '#8b7355';
+        ctx.fillRect(this.x + 6 * facing, this.y - this.height + 10, 2 * facing, 12);
+      } else {
+        ctx.fillStyle = '#d4a373';
+        const swordX = facing > 0 ? this.x + this.width / 2 : this.x - this.width / 2 - 8;
+        ctx.fillRect(swordX, this.y - this.height + 14, 8 * facing, 3);
+      }
+    }
+
     ctx.restore();
   }
 
@@ -587,9 +701,9 @@ class Enemy {
     if (this.dying) return { x: -999, y: -999, w: 0, h: 0 };
     return {
       x: this.x - this.width / 2,
-      y: this.y - this.height,
+      y: this.y - this.height - 8,
       w: this.width,
-      h: this.height
+      h: this.height + 8
     };
   }
 }
@@ -810,6 +924,7 @@ function aabb(a, b) {
 
 player = new Player();
 let fireballs = [];
+let arrows = [];
 let enemies = [];
 let particles = [];
 let score = 0;
@@ -850,12 +965,11 @@ function update(dt) {
         }
 
         if (enemy.hp <= 0) {
-          enemy.alive = false;
-          enemy.dying = true;
-          enemy.deathTimer = 0.3;
-          score++;
-          document.getElementById('score').textContent = `Score: ${score}`;
-          if (audio && audio.playExplosion) audio.playExplosion();
+enemy.dying = true;
+           enemy.deathTimer = 0.3;
+           score++;
+           document.getElementById('score').textContent = `Score: ${score}`;
+           if (audio && audio.playExplosion) audio.playExplosion();
         }
         hitEnemy = true;
         break;
@@ -867,6 +981,35 @@ function update(dt) {
     }
   }
   fireballs.length = fbWrite;
+
+  // Process arrows
+  let arwWrite = 0;
+  for (let i = 0; i < arrows.length; i++) {
+    const arw = arrows[i];
+    arw.update(dt);
+    if (arw.dead) continue;
+
+    if (!player.invincible && aabb(player.bounds, arw.bounds)) {
+      for (let k = 0; k < 10; k++) {
+        particles.push(new Particle(
+          player.x, player.y - player.height / 2,
+          (Math.random() - 0.5) * 150,
+          (Math.random() - 0.5) * 150,
+          0.3 + Math.random() * 0.2,
+          '#d4a373'
+        ));
+      }
+      player.invincible = true;
+      player.invincibleTimer = player.invincibleDuration;
+      player.flashTimer = 0.1;
+      if (audio && audio.playDeath) audio.playDeath();
+    }
+
+    if (arw.x >= cameraX - 200 && arw.x <= cameraX + WIDTH + 200) {
+      arrows[arwWrite++] = arw;
+    }
+  }
+  arrows.length = arwWrite;
 
   let eWrite = 0;
   for (let i = 0; i < enemies.length; i++) {
@@ -884,9 +1027,10 @@ function update(dt) {
           Math.random() < 0.5 ? '#ff0000' : '#ffffff'
         ));
       }
-      enemies.length = 0;
-      fireballs.length = 0;
-      particles.length = 0;
+enemies.length = 0;
+       fireballs.length = 0;
+       arrows.length = 0;
+       particles.length = 0;
       player.x = cameraX + WIDTH / 2;
       player.y = GROUND_Y;
       player.vx = 0;
@@ -925,10 +1069,11 @@ function update(dt) {
     cameraX = currentRoomIndex * ROOM_WIDTH;
     player.x = cameraX + 60;
     WORLD_WIDTH = (currentRoomIndex + 1) * ROOM_WIDTH;
-    enemies.length = 0;
-    fireballs.length = 0;
-    particles.length = 0;
-    spawnTimer = 0;
+enemies.length = 0;
+       fireballs.length = 0;
+       arrows.length = 0;
+       particles.length = 0;
+       spawnTimer = 0;
     score += 100;
     document.getElementById('score').textContent = `Score: ${score}`;
     console.log('Advanced to room', currentRoomIndex, '! Total score:', score);
@@ -1118,6 +1263,7 @@ function draw() {
     ctx.fillRect(exitX - 5, GROUND_Y - 125, 90, 10);
 
     for (const fb of fireballs) fb && fb.draw();
+    for (const arw of arrows) arw && arw.draw();
     for (const enemy of enemies) enemy && enemy.draw();
     player && player.draw();
     for (const p of particles) p && p.draw();
@@ -1140,9 +1286,9 @@ function loop(now) {
 }
 requestAnimationFrame(loop);
 
-console.log('Game started. Particles:', particles.length, 'Fireballs:', fireballs.length, 'Enemies:', enemies.length);
+console.log('Game started. Particles:', particles.length, 'Fireballs:', fireballs.length, 'Arrows:', arrows.length, 'Enemies:', enemies.length);
 setInterval(() => {
-  console.log('Stats - Particles:', particles.length, 'Fireballs:', fireballs.length, 'Enemies:', enemies.length);
+  console.log('Stats - Particles:', particles.length, 'Fireballs:', fireballs.length, 'Arrows:', arrows.length, 'Enemies:', enemies.length);
 }, 5000);
 
 class AudioController {
