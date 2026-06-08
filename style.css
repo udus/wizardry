@@ -94,6 +94,12 @@ body {
   color: #ffcc00;
 }
 
+#purse {
+  margin-bottom: 5px;
+  font-weight: bold;
+  color: #ffd700;
+}
+
 #instructions {
   font-size: 12px;
   color: #aaa;

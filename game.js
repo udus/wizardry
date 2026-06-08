@@ -191,13 +191,169 @@ const goblinFrame1 = [
   [0,0,0,0,0,0,0,0]
 ];
 
-// Warm sprite cache
-getSprite('wizard_idle_0', wizardIdle0, wizardPalette, 2);
-getSprite('wizard_idle_1', wizardIdle1, wizardPalette, 2);
-getSprite('skeleton_frame0', skeletonFrame0, skeletonPalette, 2);
-getSprite('skeleton_frame1', skeletonFrame1, skeletonPalette, 2);
-getSprite('goblin_frame0', goblinFrame0, goblinPalette, 2);
-getSprite('goblin_frame1', goblinFrame1, goblinPalette, 2);
+// Treasure sprites - all with consistent 7x7 base size for uniform collision
+const treasurePalette = [
+  'transparent',
+  '#c0c0c0',
+  '#ffd700',
+  '#e60026',
+  '#9900ff',
+  '#ff6600',
+  '#ffee88',
+  '#ffffff'
+];
+
+const silverSprite = [
+  [0,0,1,1,1,0,0],
+  [0,1,1,1,1,1,0],
+  [1,1,6,6,6,1,1],
+  [1,1,6,2,6,1,1],
+  [1,1,6,6,6,1,1],
+  [0,1,1,1,1,1,0],
+  [0,0,1,1,1,0,0]
+];
+
+const goldSprite = [
+  [0,0,2,2,2,0,0],
+  [0,2,2,2,2,2,0],
+  [2,2,6,6,6,2,2],
+  [2,2,6,2,6,2,2],
+  [2,2,6,6,6,2,2],
+  [0,2,2,2,2,2,0],
+  [0,0,2,2,2,0,0]
+];
+
+const rubySprite = [
+  [0,3,3,3,3,3,0],
+  [3,3,3,3,3,3,3],
+  [3,3,3,3,3,3,3],
+  [3,3,3,3,3,3,3],
+  [3,3,3,3,3,3,3],
+  [3,3,3,3,3,3,3],
+  [0,3,3,3,3,3,0]
+];
+
+const amethystSprite = [
+  [0,4,4,4,4,4,0],
+  [4,4,4,4,4,4,4],
+  [4,4,4,4,4,4,4],
+  [4,4,4,4,4,4,4],
+  [4,4,4,4,4,4,4],
+  [4,4,4,4,4,4,4],
+  [0,4,4,4,4,4,0]
+];
+
+const jewelrySprite = [
+  [0,0,5,5,5,0,0],
+  [0,5,6,6,6,5,0],
+  [5,6,0,0,0,6,5],
+  [5,6,0,0,0,6,5],
+  [5,6,0,0,0,6,5],
+  [0,5,6,6,6,5,0],
+  [0,0,5,5,5,0,0]
+];
+
+const goldCupSprite = [
+  [0,7,7,7,7,7,0],
+  [7,7,7,7,7,7,7],
+  [7,7,7,7,7,7,7],
+  [0,7,7,7,7,7,0],
+  [0,0,7,7,7,0,0],
+  [0,0,0,7,0,0,0],
+  [0,0,0,0,0,0,0]
+];
+
+getSprite('silver', silverSprite, treasurePalette, 3);
+getSprite('gold', goldSprite, treasurePalette, 3);
+getSprite('ruby', rubySprite, treasurePalette, 3);
+getSprite('amethyst', amethystSprite, treasurePalette, 3);
+getSprite('jewelry', jewelrySprite, treasurePalette, 3);
+getSprite('goldcup', goldCupSprite, treasurePalette, 3);
+
+let treasures = [];
+
+class TreasureItem {
+  constructor(x, y, type) {
+    this.x = x;
+    this.y = y;
+    this.type = type;
+    this.vx = (Math.random() - 0.5) * 50;
+    this.vy = -100;
+    this.collected = false;
+  }
+
+  update(dt) {
+    if (this.collected) return;
+    this.vy += 300 * dt;
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    if (this.y >= GROUND_Y) {
+      this.y = GROUND_Y - 4;
+      this.vy = 0;
+    }
+  }
+
+  draw() {
+    if (this.collected) return;
+    const sprite = getSprite(this.type, 
+      this.type === 'silver' ? silverSprite :
+      this.type === 'gold' ? goldSprite :
+      this.type === 'ruby' ? rubySprite :
+      this.type === 'amethyst' ? amethystSprite :
+      this.type === 'jewelry' ? jewelrySprite : goldCupSprite,
+      treasurePalette, 3);
+    const drawX = this.x - sprite.width / 2;
+    const drawY = this.y - sprite.height;
+    ctx.drawImage(sprite, drawX, drawY);
+  }
+
+  get value() {
+    const values = { silver: 1, gold: 5, ruby: 10, amethyst: 10, jewelry: 50, goldcup: 30 };
+    return values[this.type] || 0;
+  }
+
+  get bounds() {
+    return {
+      x: this.x - spriteWidth(this.type) / 2,
+      y: this.y - spriteHeight(this.type),
+      w: spriteWidth(this.type),
+      h: spriteHeight(this.type)
+    };
+  }
+}
+
+function spriteWidth(type) {
+  return 21;
+}
+
+function spriteHeight(type) {
+  const heights = { silver: 21, gold: 21, ruby: 21, amethyst: 21, jewelry: 21, goldcup: 21 };
+  return heights[type] || 12;
+}
+
+function spawnTreasure(enemyX, enemyY) {
+  const types = [
+    { type: 'silver', chance: 0.7 },
+    { type: 'gold', chance: 0.1 },
+    { type: 'ruby', chance: 0.05 },
+    { type: 'amethyst', chance: 0.05 },
+    { type: 'jewelry', chance: 0.01 },
+    { type: 'goldcup', chance: 0.01 }
+  ];
+  
+  const numDrops = Math.floor(Math.random() * 3) + 1;
+  for (let i = 0; i < numDrops; i++) {
+    const roll = Math.random();
+    let cumulative = 0;
+    for (const t of types) {
+      cumulative += t.chance;
+      if (roll < cumulative) {
+        treasures.push(new TreasureItem(enemyX + (Math.random() - 0.5) * 20, enemyY, t.type));
+        break;
+      }
+    }
+  }
+}
 
 function generateRoom(roomIndex) {
   const rand = seededRandom(roomIndex * 12345 + roomSeed++);
@@ -733,6 +889,7 @@ class Player {
     this.jumpBoost = 0;
     this.jumpBoostMax = 200;
     this.maxJumpHold = 0.25;
+    this.purse = 0;
   }
 
   update(dt) {
@@ -950,30 +1107,29 @@ function update(dt) {
     for (let j = 0; j < enemies.length; j++) {
       const enemy = enemies[j];
       if (!fb.bounds || !enemy.bounds) continue;
-      if (aabb(fb.bounds, enemy.bounds)) {
-        enemy.hp--;
-        enemy.flash = 0.1;
+if (aabb(fb.bounds, enemy.bounds)) {
+          enemy.hp--;
+          enemy.flash = 0.1;
 
-        for (let k = 0; k < 8; k++) {
-          particles.push(new Particle(
-            enemy.x, enemy.y - enemy.height / 2,
-            (Math.random() - 0.5) * 200,
-            (Math.random() - 0.5) * 200,
-            0.4 + Math.random() * 0.3,
-            Math.random() < 0.5 ? '#ff4400' : '#ffaa00'
-          ));
-        }
+          for (let k = 0; k < 8; k++) {
+            particles.push(new Particle(
+              enemy.x, enemy.y - enemy.height / 2,
+              (Math.random() - 0.5) * 200,
+              (Math.random() - 0.5) * 200,
+              0.4 + Math.random() * 0.3,
+              Math.random() < 0.5 ? '#ff4400' : '#ffaa00'
+            ));
+          }
 
-        if (enemy.hp <= 0) {
-enemy.dying = true;
-           enemy.deathTimer = 0.3;
-           score++;
-           document.getElementById('score').textContent = `Score: ${score}`;
-           if (audio && audio.playExplosion) audio.playExplosion();
+          if (enemy.hp <= 0) {
+            enemy.dying = true;
+            enemy.deathTimer = 0.3;
+            spawnTreasure(enemy.x, enemy.y - enemy.height / 2);
+            if (audio && audio.playExplosion) audio.playExplosion();
+          }
+          hitEnemy = true;
+          break;
         }
-        hitEnemy = true;
-        break;
-      }
     }
 
     if (!hitEnemy) {
@@ -1027,10 +1183,11 @@ enemy.dying = true;
           Math.random() < 0.5 ? '#ff0000' : '#ffffff'
         ));
       }
-enemies.length = 0;
-       fireballs.length = 0;
-       arrows.length = 0;
-       particles.length = 0;
+      enemies.length = 0;
+      fireballs.length = 0;
+      arrows.length = 0;
+      particles.length = 0;
+      treasures.length = 0;
       player.x = cameraX + WIDTH / 2;
       player.y = GROUND_Y;
       player.vx = 0;
@@ -1041,7 +1198,9 @@ enemies.length = 0;
       player.flashTimer = 0.1;
       spawnTimer = 0;
       score = 0;
+      player.purse = 0;
       document.getElementById('score').textContent = 'Score: 0';
+      document.getElementById('purse').textContent = 'Purse: 0';
       if (audio && audio.playDeath) audio.playDeath();
       break;
     }
@@ -1053,6 +1212,23 @@ enemies.length = 0;
     }
   }
   enemies.length = eWrite;
+
+  // Process treasures
+  let tWrite = 0;
+  for (let i = 0; i < treasures.length; i++) {
+    const treasure = treasures[i];
+    treasure.update(dt);
+    if (treasure.collected) continue;
+    if (aabb(player.bounds, treasure.bounds)) {
+      player.purse += treasure.value;
+      document.getElementById('purse').textContent = `Purse: ${player.purse}`;
+      treasure.collected = true;
+      if (audio && audio.playCoin) audio.playCoin();
+      continue;
+    }
+treasures[tWrite++] = treasure;
+  }
+  treasures.length = tWrite;
 
   let write = 0;
   for (let i = 0; i < particles.length; i++) {
@@ -1069,11 +1245,12 @@ enemies.length = 0;
     cameraX = currentRoomIndex * ROOM_WIDTH;
     player.x = cameraX + 60;
     WORLD_WIDTH = (currentRoomIndex + 1) * ROOM_WIDTH;
-enemies.length = 0;
-       fireballs.length = 0;
-       arrows.length = 0;
-       particles.length = 0;
-       spawnTimer = 0;
+    enemies.length = 0;
+    fireballs.length = 0;
+    arrows.length = 0;
+    particles.length = 0;
+    treasures.length = 0;
+    spawnTimer = 0;
     score += 100;
     document.getElementById('score').textContent = `Score: ${score}`;
     console.log('Advanced to room', currentRoomIndex, '! Total score:', score);
@@ -1255,6 +1432,8 @@ function draw() {
       }
     }
 
+    for (const t of treasures) t && t.draw();
+
     const exitX = WORLD_WIDTH - 80;
     ctx.fillStyle = '#555555';
     ctx.fillRect(exitX, GROUND_Y - 120, 10, 120);
@@ -1410,6 +1589,13 @@ class AudioController {
     notes.forEach((freq, i) => {
       this.playTone(freq, 'triangle', 0.12, this.sfxGain, t + i * 0.1);
     });
+  }
+
+  playCoin() {
+    if (!this.initialized) return;
+    const t = this.ctx.currentTime;
+    this.playTone(880, 'square', 0.05, this.sfxGain, t);
+    this.playTone(1200, 'square', 0.05, this.sfxGain, t + 0.05);
   }
 }
 
