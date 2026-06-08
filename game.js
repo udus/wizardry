@@ -1084,7 +1084,6 @@ let fireballs = [];
 let arrows = [];
 let enemies = [];
 let particles = [];
-let score = 0;
 let spawnTimer = 0;
 const spawnInterval = 2;
 
@@ -1197,9 +1196,7 @@ if (aabb(fb.bounds, enemy.bounds)) {
       player.invincibleTimer = player.invincibleDuration;
       player.flashTimer = 0.1;
       spawnTimer = 0;
-      score = 0;
       player.purse = 0;
-      document.getElementById('score').textContent = 'Score: 0';
       document.getElementById('purse').textContent = 'Purse: 0';
       if (audio && audio.playDeath) audio.playDeath();
       break;
@@ -1251,10 +1248,7 @@ treasures[tWrite++] = treasure;
     particles.length = 0;
     treasures.length = 0;
     spawnTimer = 0;
-    score += 100;
-    document.getElementById('score').textContent = `Score: ${score}`;
-    console.log('Advanced to room', currentRoomIndex, '! Total score:', score);
-    if (audio && audio.playFanfare) audio.playFanfare();
+    console.log('Advanced to room', currentRoomIndex);
   }
 }
 
@@ -1474,10 +1468,7 @@ class AudioController {
   constructor() {
     this.ctx = null;
     this.masterGain = null;
-    this.bgmGain = null;
     this.sfxGain = null;
-    this.bgmInterval = null;
-    this.step = 0;
     this.initialized = false;
   }
 
@@ -1489,16 +1480,11 @@ class AudioController {
       this.masterGain.gain.value = 0.25;
       this.masterGain.connect(this.ctx.destination);
 
-      this.bgmGain = this.ctx.createGain();
-      this.bgmGain.gain.value = 0.15;
-      this.bgmGain.connect(this.masterGain);
-
       this.sfxGain = this.ctx.createGain();
       this.sfxGain.gain.value = 0.4;
       this.sfxGain.connect(this.masterGain);
 
       this.initialized = true;
-      this.startBGM();
     } catch (e) {
       console.warn('Audio init failed:', e);
     }
@@ -1508,25 +1494,6 @@ class AudioController {
     if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume();
     }
-  }
-
-  startBGM() {
-    if (!this.initialized || this.bgmInterval) return;
-    const bassline = [130.81, 164.81, 196.0, 130.81];
-    const melody = [523.25, 659.25, 783.99, 659.25];
-    let noteIndex = 0;
-    this.bgmInterval = setInterval(() => {
-      if (!this.initialized) return;
-      const t = this.ctx.currentTime;
-      const bass = bassline[noteIndex % bassline.length];
-      const mel = melody[noteIndex % melody.length];
-
-      this.playTone(bass, 'square', 0.12, this.bgmGain, t);
-      if (noteIndex % 2 === 0) {
-        this.playTone(mel, 'triangle', 0.08, this.bgmGain, t + 0.06);
-      }
-      noteIndex++;
-    }, 220);
   }
 
   playTone(freq, type, duration, output, startTime) {
@@ -1580,15 +1547,6 @@ class AudioController {
     this.playTone(220, 'sawtooth', 0.25, this.sfxGain, t);
     this.playNoise(0.25, this.sfxGain, t);
     this.playTone(110, 'triangle', 0.3, this.sfxGain, t + 0.15);
-  }
-
-  playFanfare() {
-    if (!this.initialized) return;
-    const t = this.ctx.currentTime;
-    const notes = [523.25, 659.25, 783.99];
-    notes.forEach((freq, i) => {
-      this.playTone(freq, 'triangle', 0.12, this.sfxGain, t + i * 0.1);
-    });
   }
 
   playCoin() {
