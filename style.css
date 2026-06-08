@@ -47,7 +47,8 @@ body {
   bottom: 20px;
   width: 100%;
   display: none;
-  justify-content: space-between;
+  justify-content: flex-end;
+  align-items: flex-end;
   padding: 0 20px;
   z-index: 10;
 }
@@ -78,14 +79,12 @@ body {
   margin-left: auto;
 }
 
-#fireball-btn {
-  position: absolute;
-  right: 20px;
-  bottom: 100px;
-  width: 70px;
-  height: 70px;
-  border-radius: 50%;
-  font-size: 14px;
+#joystick {
+  display: none;
+}
+
+#joystick-knob {
+  pointer-events: none;
 }
 
 #purse {

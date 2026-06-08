@@ -522,33 +522,125 @@ canvas.addEventListener('click', e => {
   player.castFireball(mx, my);
 });
 
+// Mobile joystick controls - dynamic touch-based joystick
+const joystick = document.createElement('div');
+joystick.id = 'joystick';
+joystick.style.cssText = `
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  display: none;
+  touch-action: none;
+  transform: translate(-50px, -50px);
+`;
+
+const joystickKnob = document.createElement('div');
+joystickKnob.id = 'joystick-knob';
+joystickKnob.style.cssText = `
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(255, 204, 0, 0.7);
+  top: 25px;
+  left: 25px;
+  touch-action: none;
+`;
+
+joystick.appendChild(joystickKnob);
+document.getElementById('game-container').appendChild(joystick);
+
+let joystickActive = false;
+let joystickStartX = 0;
+let joystickStartY = 0;
+
+function showJoystick(x, y) {
+  joystick.style.left = x + 'px';
+  joystick.style.top = y + 'px';
+  joystick.style.display = 'block';
+  joystickStartX = x;
+  joystickStartY = y;
+}
+
+function hideJoystick() {
+  joystick.style.display = 'none';
+  joystickKnob.style.transform = '';
+}
+
+canvas.addEventListener('touchstart', e => {
+  if (!joystickActive && e.touches.length > 0) {
+    const touch = e.touches[0];
+    // If touch is on left side, show joystick for movement
+    if (touch.clientX < window.innerWidth / 2) {
+      showJoystick(touch.clientX, touch.clientY);
+      joystickActive = true;
+    } else {
+      // Right side = shoot in that direction
+      ensureAudio();
+      const rect = canvas.getBoundingClientRect();
+      const clickScaleX = WIDTH / rect.width;
+      const clickScaleY = HEIGHT / rect.height;
+      const mx = (touch.clientX - rect.left) * clickScaleX + cameraX;
+      const my = (touch.clientY - rect.top) * clickScaleY;
+      player.castFireball(mx, my);
+    }
+  }
+});
+
+canvas.addEventListener('touchmove', e => {
+  if (joystickActive && e.touches[0]) {
+    const touch = e.touches[0];
+    const dx = touch.clientX - joystickStartX;
+    const dy = touch.clientY - joystickStartY;
+    const dist = Math.min(35, Math.hypot(dx, dy));
+    const angle = Math.atan2(dy, dx);
+    
+    const knobX = Math.cos(angle) * dist;
+    const knobY = Math.sin(angle) * dist;
+    joystickKnob.style.transform = `translate(${knobX}px, ${knobY}px)`;
+    
+    keys['a'] = dx < -10;
+    keys['d'] = dx > 10;
+    
+    // Shoot on upward swipe
+    if (dy < -20 && Math.abs(dx) < 20) {
+      ensureAudio();
+      const rect = canvas.getBoundingClientRect();
+      const clickScaleX = WIDTH / rect.width;
+      const clickScaleY = HEIGHT / rect.height;
+      const mx = (touch.clientX - rect.left) * clickScaleX + cameraX;
+      const my = (touch.clientY - rect.top) * clickScaleY;
+      player.castFireball(mx, my);
+    }
+  }
+});
+
+canvas.addEventListener('touchend', e => {
+  if (joystickActive) {
+    joystickActive = false;
+    hideJoystick();
+    keys['a'] = false;
+    keys['d'] = false;
+  }
+});
+
 // Mobile controls
-const leftBtn = document.getElementById('left-btn');
-const rightBtn = document.getElementById('right-btn');
 const jumpBtn = document.getElementById('jump-btn');
-const fireballBtn = document.getElementById('fireball-btn');
 
-function setupButton(btn, key, isFireball = false) {
+function setupButton(btn, key) {
   if (!btn) return;
-  btn.addEventListener('mousedown', e => { e.preventDefault(); keys[key] = true; if (isFireball) fireballBtnClicked(); });
-  btn.addEventListener('mouseup', e => { e.preventDefault(); if (!isFireball) keys[key] = false; });
-  btn.addEventListener('mouseleave', e => { e.preventDefault(); if (!isFireball) keys[key] = false; });
-  btn.addEventListener('touchstart', e => { e.preventDefault(); keys[key] = true; if (isFireball) fireballBtnClicked(); });
-  btn.addEventListener('touchend', e => { e.preventDefault(); if (!isFireball) keys[key] = false; });
-  btn.addEventListener('touchcancel', e => { e.preventDefault(); if (!isFireball) keys[key] = false; });
+  btn.addEventListener('mousedown', e => { e.preventDefault(); keys[key] = true; });
+  btn.addEventListener('mouseup', e => { e.preventDefault(); keys[key] = false; });
+  btn.addEventListener('mouseleave', e => { e.preventDefault(); keys[key] = false; });
+  btn.addEventListener('touchstart', e => { e.preventDefault(); keys[key] = true; });
+  btn.addEventListener('touchend', e => { e.preventDefault(); keys[key] = false; });
+  btn.addEventListener('touchcancel', e => { e.preventDefault(); keys[key] = false; });
 }
 
-function fireballBtnClicked() {
-  ensureAudio();
-  const centerX = cameraX + WIDTH / 2;
-  const centerY = GROUND_Y - 100;
-  player.castFireball(centerX, centerY);
-}
-
-setupButton(leftBtn, 'a');
-setupButton(rightBtn, 'd');
 setupButton(jumpBtn, 'w');
-setupButton(fireballBtn, ' ', true);
 
 class Particle {
   constructor(x, y, vx, vy, life, color) {
